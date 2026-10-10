@@ -1,4 +1,13 @@
-const {
+const http = require("http");
+
+const PORT = process.env.PORT || 3000;
+
+http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("JONATHAN-BOT est en ligne !");
+}).listen(PORT, "0.0.0.0", () => {
+  console.log("Serveur web démarré sur le port " + PORT);
+});const {
   default: makeWASocket,
   useMultiFileAuthState,
   DisconnectReason
