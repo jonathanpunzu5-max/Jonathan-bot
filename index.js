@@ -29,9 +29,19 @@ async function demarrerBot() {
   bot.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect } = update;
 
-    if (connection === "connecting" && !bot.authState?.creds?.registered) {
-      // Le code d'association sera ajouté après vérification du numéro.
-    }
+    if (connection === "connecting" && !state.creds.registered) {
+  try {
+    const numero = config.ownerNumber.replace(/\D/g, "");
+    const code = await bot.requestPairingCode(numero);
+
+    console.log("================================");
+    console.log("🤖 JONATHAN-BOT");
+    console.log("🔑 CODE D'ASSOCIATION :", code);
+    console.log("================================");
+  } catch (erreur) {
+    console.error("Erreur du code d'association :", erreur);
+  }
+}
 
     if (connection === "open") {
       console.log(`${config.botName} connecté !`);
