@@ -1,24 +1,20 @@
 const http = require("http");
+const config = require("./config");
+const P = require("pino");
+const {
+  default: makeWASocket,
+  useMultiFileAuthState,
+  DisconnectReason
+} = require("@whiskeysockets/baileys");
 
 const PORT = process.env.PORT || 3000;
 
 http.createServer((req, res) => {
   res.writeHead(200, { "Content-Type": "text/plain" });
   res.end("JONATHAN-BOT est en ligne !");
-}).listen(PORT, "0.0.0.0", () => {
-  console.log("Serveur web démarré sur le port " + PORT);
-});const {
-  default: makeWASocket,
-  useMultiFileAuthState,
-  DisconnectReason
-} = require("@whiskeysockets/baileys");
-
-const P = require("pino");
-const qrcode = require("qrcode-terminal");
-const config = require("./config");
+}).listen(PORT, "0.0.0.0");
 
 async function demarrerBot() {
-
   const { state, saveCreds } =
     await useMultiFileAuthState("./session");
 
@@ -30,43 +26,31 @@ async function demarrerBot() {
 
   bot.ev.on("creds.update", saveCreds);
 
-  bot.ev.on("connection.update", (update) => {
+  bot.ev.on("connection.update", async (update) => {
+    const { connection, lastDisconnect } = update;
 
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      console.log("📱 SCANNE CE QR CODE AVEC WHATSAPP");
-      qrcode.generate(qr, { small: true });
+    if (connection === "connecting" && !bot.authState?.creds?.registered) {
+      // Le code d'association sera ajouté après vérification du numéro.
     }
 
     if (connection === "open") {
-      console.log("╭━━━━━━━━━━━━━━━━━━╮");
-      console.log(`┃ 🤖 ${config.botName}`);
-      console.log("┃ ✅ BOT CONNECTÉ !");
-      console.log(`┃ 👑 ${config.ownerName}`);
-      console.log("╰━━━━━━━━━━━━━━━━━━╯");
+      console.log(`${config.botName} connecté !`);
     }
 
     if (connection === "close") {
-
-      const code =
-        lastDisconnect?.error?.output?.statusCode;
+      const code = lastDisconnect?.error?.output?.statusCode;
 
       if (code !== DisconnectReason.loggedOut) {
-        console.log("🔄 Reconnexion...");
-        demarrerBot();
+        setTimeout(demarrerBot, 3000);
       } else {
-        console.log("❌ Session WhatsApp déconnectée.");
+        console.log("Session déconnectée. Reconnexion nécessaire.");
       }
     }
   });
 
   bot.ev.on("messages.upsert", async ({ messages }) => {
-
     const message = messages[0];
-
-    if (!message?.message) return;
-    if (message.key.fromMe) return;
+    if (!message?.message || message.key.fromMe) return;
 
     const texte =
       message.message.conversation ||
@@ -75,74 +59,26 @@ async function demarrerBot() {
 
     if (!texte.startsWith(config.prefix)) return;
 
-    const parties = texte
-      .slice(config.prefix.length)
-      .trim()
-      .split(/\s+/);
-
+    const parties = texte.slice(config.prefix.length).trim().split(/\s+/);
     const commande = parties.shift()?.toLowerCase();
-
     const chat = message.key.remoteJid;
 
     if (commande === "ping") {
-      await bot.sendMessage(chat, {
-        text: "🏓 Pong !\n🤖 JONATHAN-BOT fonctionne."
-      });
+      await bot.sendMessage(chat, { text: "🏓 Pong ! JONATHAN-BOT fonctionne." });
     }
 
     if (commande === "menu") {
-
-      const menu = `
-╭━━━〔 🤖 ${config.botName} 〕━━━╮
-┃
-┃ 👑 Propriétaire : ${config.ownerName}
-┃ ⚡ Préfixe : ${config.prefix}
-┃
-┃ 📌 COMMANDES
-┃
-┃ • .ping
-┃ • .menu
-┃ • .info
-┃
-┃ 👥 GROUPE
-┃
-┃ • .tag
-┃ • .kick
-┃ • .add
-┃ • .groupinfo
-┃
-┃ 🛡️ SÉCURITÉ
-┃
-┃ • .antilink
-┃
-┃ 🤖 AUTOMATISATION
-┃
-┃ • .autoreply
-┃
-╰━━━━━━━━━━━━━━━━━━━━╯
-`;
-
       await bot.sendMessage(chat, {
-        text: menu
+        text: `🤖 ${config.botName}\n👑 ${config.ownerName}\n\n📌 COMMANDES\n• .ping\n• .menu\n• .info`
       });
     }
 
     if (commande === "info") {
-
       await bot.sendMessage(chat, {
-        text: `
-╭━━〔 ℹ️ INFORMATIONS 〕━━╮
-┃
-┃ 🤖 Bot : ${config.botName}
-┃ 👑 Owner : ${config.ownerName}
-┃ ⚙️ Version : 1.0.0
-┃ 🔑 Préfixe : ${config.prefix}
-┃
-╰━━━━━━━━━━━━━━━━━━━━╯
-`
+        text: `🤖 Bot : ${config.botName}\n👑 Propriétaire : ${config.ownerName}\n⚙️ Version : 1.0.0\n🔑 Préfixe : ${config.prefix}`
       });
     }
   });
 }
 
-demarrerBot();
+demarrerBot().catch(console.error);
